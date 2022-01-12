@@ -22,6 +22,9 @@ module ActiveRecord
           if options[:value]
             sql.gsub!(/\s+(.*)/, " \\1(#{options[:value]})")
           end
+          if options[:simple_aggregate_function]
+            sql.gsub!(/\s+(.*)/, " SimpleAggregateFunction(#{options[:simple_aggregate_function]}, \\1)")
+          end
           if options[:fixed_string]
             sql.gsub!(/\s+(.*)/, " FixedString(#{options[:fixed_string]})")
           end
@@ -36,6 +39,8 @@ module ActiveRecord
           end
           sql.gsub!(/(\sString)\(\d+\)/, '\1')
           sql << " DEFAULT #{quote_default_expression(options[:default], options[:column])}" if options_include_default?(options)
+          sql << " CODEC(#{options[:codec]})" if options[:codec]
+          sql << " TTL #{options[:ttl]}" if options[:ttl]
           sql
         end
 
@@ -59,7 +64,7 @@ module ActiveRecord
 
           if match
             opts[match.begin(:table_name)...match.end(:table_name)] =
-              "#{current_database}.#{match[:table_name].sub('.', '')}"
+              "#{current_database}.`#{match[:table_name]}`"
           end
 
           " ENGINE = #{opts}"
@@ -76,12 +81,17 @@ module ActiveRecord
           # If you do not specify a database explicitly, ClickHouse will use the "default" database.
           return unless subquery
 
-          match = subquery.match(/(?<=from)[^.\w]+(?<database>\w+(?=\.))?(?<table_name>[.\w]+)/i)
-          return unless match
-          return if match[:database]
+          matches = global_match(
+            subquery,
+            /((?<=from)|((?<join_type>\w+\s+)join))[\n\s]+(?<database>\w+(?=\.))?(?<table_name>[.\w]+)/i
+          )
+          matches.reverse.each do |match|
+            next if match[:database]
+            next if match[:join_type]&.strip&.downcase == 'array'
 
-          subquery[match.begin(:table_name)...match.end(:table_name)] =
-            "#{current_database}.#{match[:table_name].sub('.', '')}"
+            subquery[match.begin(:table_name)...match.end(:table_name)] =
+              "#{current_database}.`#{match[:table_name]}`"
+          end
         end
 
         def add_to_clause!(create_sql, options)
@@ -92,18 +102,18 @@ module ActiveRecord
           return unless match
           return if match[:database]
 
-          create_sql << "TO #{current_database}.#{match[:table_name].sub('.', '')}"
+          create_sql << " TO #{current_database}.`#{match[:table_name]}`"
         end
 
         def visit_TableDefinition(o)
           create_sql = +entity_type(o)
-          create_sql << "IF NOT EXISTS " if o.if_not_exists
-          create_sql << "#{quote_table_name(o.name)} "
+          create_sql << 'IF NOT EXISTS ' if o.if_not_exists
+          create_sql << quote_table_name(o.name)
           add_to_clause!(create_sql, o) if o.materialized
 
           statements = o.columns.map { |c| accept c }
           statements << accept(o.primary_keys) if o.primary_keys
-          create_sql << "(#{statements.join(', ')})" if statements.present?
+          create_sql << " (#{statements.join(', ')})" if statements.present?
           # Attach options for only table or materialized view without TO section
           add_table_options!(create_sql, o) if !o.view || o.view && o.materialized && !o.to
           add_as_clause!(create_sql, o)
@@ -138,12 +148,25 @@ module ActiveRecord
             quoted_default = quote_default_expression(options[:default], column)
             change_column_sql << " DEFAULT #{quoted_default}"
           end
-
+          change_column_sql << " CODEC(#{options[:codec]})" if options[:codec]
+          change_column_sql << " TTL #{options[:ttl]}" if options[:ttl]
           change_column_sql
         end
 
         def current_database
           ActiveRecord::Base.connection_db_config.database
+        end
+
+        private
+
+        def global_match(str, regex)
+          start_at = 0
+          matches  = []
+          while (m = str.match(regex, start_at))
+            matches.push(m)
+            start_at = m.end(0)
+          end
+          matches
         end
       end
     end

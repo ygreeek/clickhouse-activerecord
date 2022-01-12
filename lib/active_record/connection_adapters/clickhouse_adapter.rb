@@ -102,11 +102,12 @@ module ActiveRecord
         integer: { name: 'UInt32' },
         big_integer: { name: 'UInt64' },
         float: { name: 'Float32' },
+        double: { name: 'Float64' },
         decimal: { name: 'Decimal' },
         datetime: { name: 'DateTime' },
         datetime64: { name: 'DateTime64' },
         date: { name: 'Date' },
-        boolean: { name: 'UInt8' },
+        boolean: { name: 'Boolean' },
         uuid: { name: 'UUID' },
 
         enum8: { name: 'Enum8' },
@@ -215,14 +216,14 @@ module ActiveRecord
       # Quoting time without microseconds
       def quoted_date(value)
         if value.acts_like?(:time)
-          zone_conversion_method = ActiveRecord::Base.default_timezone == :utc ? :getutc : :getlocal
+          zone_conversion_method = ActiveRecord.default_timezone == :utc ? :getutc : :getlocal
 
           if value.respond_to?(zone_conversion_method)
             value = value.send(zone_conversion_method)
           end
         end
 
-        value.to_s(:db)
+        value.to_formatted_s(:db)
       end
 
       def column_name_for_operation(operation, node) # :nodoc:
@@ -375,7 +376,9 @@ module ActiveRecord
         database_engine_atomic? && @full_config[:use_default_replicated_merge_tree_params]
       end
 
-      def use_replica?
+      def use_replica?(options)
+        return false if options[:use_replica] == false
+
         (replica || use_default_replicated_merge_tree_params?) && cluster
       end
 
@@ -431,7 +434,7 @@ module ActiveRecord
       end
 
       def apply_replica(table, options)
-        if use_replica? && options[:options]
+        if use_replica?(options) && options[:options]
           if options[:options].match(/^Replicated/)
             raise 'Do not try create Replicated table. It will be configured based on the *MergeTree engine.'
           end
