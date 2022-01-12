@@ -80,6 +80,10 @@ module ActiveRecord
           args.each { |name| column(name, :uuid, **options) }
         end
 
+        def double(*args, **options)
+          args.each { |name| column(name, :double, **options) }
+        end
+
         def enum(*args, **options)
           kind = :enum8
 
