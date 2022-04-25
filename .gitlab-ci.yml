@@ -1,0 +1,6 @@
+include:
+- project: templates/ruby
+  file: private-gem.yml
+
+variables:
+  RUBY_VERSION: 3.0.2
