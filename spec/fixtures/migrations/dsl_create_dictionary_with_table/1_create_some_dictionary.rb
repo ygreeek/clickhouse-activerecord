@@ -2,7 +2,7 @@ class CreateSomeDictionary < ActiveRecord::Migration[5.0]
   def change
     options = <<~SQL
       PRIMARY KEY id
-      SOURCE(HTTP(url 'http://localhost:3000/file.json' format 'JSONEachRow'))
+      SOURCE(FILE(path '/var/lib/clickhouse/user_files/test.json' format 'JSONEachRow'))
       LAYOUT(FLAT)
       LIFETIME(300)
     SQL

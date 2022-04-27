@@ -25,19 +25,6 @@ RSpec.describe 'Migration', :migrations do
       end
 
       context 'dsl' do
-        context 'empty' do
-          it 'creates a table' do
-            migrations_dir = File.join(FIXTURES_PATH, 'migrations', 'dsl_table_creation')
-            quietly { ActiveRecord::MigrationContext.new(migrations_dir, model.connection.schema_migration).up }
-
-            current_schema = schema(model)
-
-            expect(current_schema.keys.count).to eq(1)
-            expect(current_schema).to have_key('id')
-            expect(current_schema['id'].sql_type).to eq('UInt32')
-          end
-        end
-
         context 'with engine' do
           it 'creates a table' do
             migrations_dir = File.join(FIXTURES_PATH, 'migrations', 'dsl_table_with_engine_creation')
@@ -213,14 +200,13 @@ RSpec.describe 'Migration', :migrations do
             quietly { ActiveRecord::MigrationContext.new(migrations_dir, ClickhouseActiverecord::SchemaMigration).up }
 
             expect(ActiveRecord::Base.connection.tables).to include('some_view')
-            expect(ActiveRecord::Base.connection.tables).to include('.inner.some_view')
-
+            expect(ActiveRecord::Base.connection.tables).to include(/.inner_id/)
             quietly do
               ClickhouseActiverecord::MigrationContext.new(migrations_dir, ClickhouseActiverecord::SchemaMigration).down
             end
 
             expect(ActiveRecord::Base.connection.tables).not_to include('some_view')
-            expect(ActiveRecord::Base.connection.tables).not_to include('.inner.some_view')
+            expect(ActiveRecord::Base.connection.tables).not_to include(/.inner_id/)
           end
         end
 
@@ -271,11 +257,9 @@ RSpec.describe 'Migration', :migrations do
 
         current_schema = schema(model)
 
-        expect(current_schema.keys.count).to eq(3)
-        expect(current_schema).to have_key('id')
+        expect(current_schema.keys.count).to eq(2)
         expect(current_schema).to have_key('date')
         expect(current_schema).to have_key('new_column')
-        expect(current_schema['id'].sql_type).to eq('UInt32')
         expect(current_schema['date'].sql_type).to eq('Date')
         expect(current_schema['new_column'].sql_type).to eq('Nullable(UInt64)')
       end

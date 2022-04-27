@@ -4,3 +4,18 @@ include:
 
 variables:
   RUBY_VERSION: 3.0.2
+
+test:
+  image: docker/compose:1.29.2
+  variables:
+    DOCKER_HOST: tcp://docker:2375
+    COMPOSE_HTTP_TIMEOUT: 500
+    DOCKER_TLS_CERTDIR: ""
+  before_script:
+    - apk update && apk add make gettext
+    - make cluster_config
+    - docker-compose -f spec/cluster/docker-compose.yml up -d
+    - docker-compose -f spec/cluster/docker-compose.yml exec -T ruby gem install bundler:1.17.3
+    - docker-compose -f spec/cluster/docker-compose.yml exec -T ruby bundle _1.17.3_ install
+  script:
+    - docker-compose -f spec/cluster/docker-compose.yml exec -T ruby bundle exec rspec

@@ -7,7 +7,7 @@ require 'clickhouse-activerecord'
 require 'active_support/testing/stream'
 
 FIXTURES_PATH = File.join(File.dirname(__FILE__), 'fixtures')
-CLUSTER_NAME = 'test'
+CLUSTER_NAME = 'test_cluster'
 
 RSpec.configure do |config|
   # Enable flags like --only-failures and --next-failure
@@ -35,7 +35,7 @@ end
 ActiveRecord::Base.configurations = HashWithIndifferentAccess.new(
   default: {
     adapter: 'clickhouse',
-    host: 'localhost',
+    host: ENV['CLICKHOUSE_HOST'] || 'localhost',
     port: 8123,
     database: 'test',
     username: nil,
